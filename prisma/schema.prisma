@@ -1,0 +1,71 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum ReservationStatus {
+  ACTIVE
+  RELEASED
+}
+
+model Program {
+  id                  String        @id @default(uuid()) @db.Uuid
+  name                String
+  currency            String        @db.Char(3)
+  creditLimit         Decimal       @map("credit_limit") @db.Decimal(19, 4)
+  reservedAmount      Decimal       @default(0) @map("reserved_amount") @db.Decimal(19, 4)
+  version             Int           @default(0)
+  lastReconciledAt    DateTime?     @map("last_reconciled_at")
+  lastTreasuryEventId String?       @map("last_treasury_event_id")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+  reservations        Reservation[]
+
+  @@map("programs")
+}
+
+model Reservation {
+  id              String             @id @default(uuid()) @db.Uuid
+  programId       String             @map("program_id") @db.Uuid
+  program         Program            @relation(fields: [programId], references: [id], onDelete: Restrict)
+  invoiceId       String             @map("invoice_id")
+  invoiceAmount   Decimal            @map("invoice_amount") @db.Decimal(19, 4)
+  invoiceCurrency String             @map("invoice_currency") @db.Char(3)
+  reservedAmount  Decimal            @map("reserved_amount") @db.Decimal(19, 4)
+  fxRate          Decimal            @map("fx_rate") @db.Decimal(18, 8)
+  status          ReservationStatus
+  reservedAt      DateTime           @default(now()) @map("reserved_at")
+  releasedAt      DateTime?          @map("released_at")
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  @@unique([programId, invoiceId])
+  @@index([programId, status])
+  @@map("reservations")
+}
+
+model FxRate {
+  id        String   @id @default(uuid()) @db.Uuid
+  base      String   @db.Char(3)
+  quote     String   @db.Char(3)
+  rate      Decimal  @db.Decimal(18, 8)
+  asOf      DateTime @map("as_of")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([base, quote])
+  @@map("fx_rates")
+}
+
+model ProcessedTreasuryEvent {
+  eventId     String   @id @map("event_id")
+  eventType   String   @map("event_type")
+  programId   String   @map("program_id")
+  processedAt DateTime @default(now()) @map("processed_at")
+
+  @@map("processed_treasury_events")
+}
